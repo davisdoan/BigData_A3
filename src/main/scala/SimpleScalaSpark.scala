@@ -2,12 +2,10 @@
 import org.apache.spark
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
-import org.apache.spark.util.random
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import java.io._
 import org.apache.spark.mllib.rdd.RDDFunctions._
-import scala.collection.mutable.ArrayBuffer
 
 object SimpleScalaSpark {
 
@@ -60,12 +58,11 @@ object SimpleScalaSpark {
       val dataFileSum = dataFileRDD.map(word => (word, 1)).reduceByKey(_+_)
       println("The count is " + dataFileCount + " the sum is " + sumRDD + " the mean is " + meannnnnn + " the std dev is " + stddev)
 
-
       // q3
       val df = spark.read.text("data.txt")
       df.select(mean(df("value"))).show
       df.select(stddev_pop(df("value"))).show
-      //dataFileDF.select(stddev(dataFileDF("value"))).show
+      //df.select(stddev(df("value"))).show
       //dataFileDF.select(stddev(dataFileDF.select("value"))).show
 
       //q4
@@ -78,8 +75,40 @@ object SimpleScalaSpark {
       val hundredDoublesRDD = sc.textFile("hundredDoubles.txt")
       val slider = hundredDoublesRDD.map(x => x.toDouble)
       val mover = slider.sliding(20).map(slice => (slice.sum / slice.size))
-      mover.foreach(x=> {println(" The mean of the window is " + x)})
+      //mover.foreach(x=> {println(" The mean of the window is " + x)})
       //val slidingWindowRDD = hundredDoublesRDD.collect().sliding(20).map(slice => slice.toDouble)
+
+      //q6
+      val dfSetup = spark.read
+      dfSetup.option("header", true)
+      dfSetup.option("inferSchema", true)
+      dfSetup.option("sep", "\t")
+
+      val dfMultipleSites = dfSetup.csv("multiple-sites.tsv")
+      //dfMultipleSites.groupBy("site").mean("dwell-time").sort("site").as("Avg Dwell-Time").show()
+
+      //q7
+      val dfDwellTimes = dfSetup.csv("dwell-times.tsv")
+      val withHour = dfDwellTimes.withColumnRenamed("date", "TimeStamp")
+        .withColumn("Date", to_date(col("TimeStamp")))
+        .withColumn("Hour", hour(col("TimeStamp")))
+        .withColumn("Month", date_format(col("Date"), "MMMMM"))
+        .withColumn("DayOfWeek", date_format(col("TimeStamp"), "EEEE"))
+
+      //withHour.show(3)
+      withHour.groupBy("Hour").mean("dwell-time").sort("Hour").as("Dwell-Time (Per Hour)").show(24)
+      withHour.groupBy("DayOfWeek").mean("dwell-time").sort("DayOfWeek").show(7)
+      val setupWeeklyDF = withHour.groupBy("DayOfWeek").mean("dwell-time")
+      val averageDwellWeekDay = setupWeeklyDF
+        .where(col("DayOfWeek") =!= "Sunday")
+        .where(col("DayOfWeek") =!= "Saturday")
+        .sort("DayOfWeek").show(7)
+
+      val averageDwellWeekend = setupWeeklyDF
+        .where(col("DayOfWeek").contains("Sunday").or(col("DayOfWeek").contains("Saturday"))).show()
+
+      //q8
+      // The times from question #7 indicate that the users are more active on the weekends.
 
 
 
